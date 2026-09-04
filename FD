@@ -1,0 +1,134 @@
+-- โหลด Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "FD Hub | Roblox Script",
+   LoadingTitle = "กำลังโหลดสคริปต์...",
+   LoadingSubtitle = "โดย FD",
+   ConfigurationSaving = {
+      Enabled = false
+   }
+})
+
+local Tab = Window:CreateTab("Main Hacks", 4483362458) -- สร้างเมนูหลัก
+
+-- Variables สำหรับตั้งค่า
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local walkSpeed = 16
+local isFlyEnabled = false
+local flySpeed = 50
+local isInfiniteJumpEnabled = false
+
+-- 1. ฟังก์ชันปรับความเร็ว (WalkSpeed)
+Tab:CreateSlider({
+   Name = "ปรับความเร็วเดิน (WalkSpeed)",
+   Range = {1, 700},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "SpeedSlider",
+   Callback = function(Value)
+      walkSpeed = Value
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
+      end
+   end,
+})
+
+-- ลูปเช็คความเร็วเพื่อไม่ให้เกมรีเซ็ตกลับเป็นค่าเดิม
+RunService.RenderStepped:Connect(function()
+   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+      if LocalPlayer.Character.Humanoid.WalkSpeed ~= walkSpeed then
+         LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
+      end
+   end
+end)
+
+-- 2. ฟังก์ชันกระโดดไม่จำกัด (Infinite Jump)
+Tab:CreateToggle({
+   Name = "กระโดดไม่จำกัด (Infinite Jump)",
+   CurrentValue = false,
+   Flag = "InfJumpToggle",
+   Callback = function(Value)
+      isInfiniteJumpEnabled = Value
+   end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+   if isInfiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+      LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+   end
+end)
+
+-- 3. ฟังก์ชันปรับความเร็วการบิน (Fly Speed)
+Tab:CreateSlider({
+   Name = "ความเร็วการบิน (Fly Speed)",
+   Range = {1, 100},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 50,
+   Flag = "FlySpeedSlider",
+   Callback = function(Value)
+      flySpeed = Value
+   end,
+})
+
+-- 4. ฟังก์ชัน เปิด/ปิด การบิน (Fly)
+local bodyVelocity, bodyGyro
+Tab:CreateToggle({
+   Name = "เปิดระบบบิน (Fly)",
+   CurrentValue = false,
+   Flag = "FlyToggle",
+   Callback = function(Value)
+      isFlyEnabled = Value
+      local char = LocalPlayer.Character
+      if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+      
+      local root = char.HumanoidRootPart
+      
+      if isFlyEnabled then
+         bodyVelocity = Instance.new("BodyVelocity")
+         bodyVelocity.Velocity = Vector3.zero
+         bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+         bodyVelocity.Parent = root
+         
+         bodyGyro = Instance.new("BodyGyro")
+         bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+         bodyGyro.CFrame = root.CFrame
+         bodyGyro.Parent = root
+         
+         -- ลูปควบคุมการบินตามทิศทางกล้อง
+         task.spawn(function()
+            while isFlyEnabled and task.wait() do
+               local camera = workspace.CurrentCamera
+               local moveDir = Vector3.zero
+               
+               if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+               if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+               if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+               
+               if bodyVelocity and bodyGyro then
+                  bodyVelocity.Velocity = moveDir * (flySpeed * 2)
+                  bodyGyro.CFrame = camera.CFrame
+               end
+            end
+         end)
+      else
+         if bodyVelocity then bodyVelocity:Destroy() end
+         if bodyGyro then bodyGyro:Destroy() end
+      end
+   end,
+})
+
+-- รีเซ็ตค่าเมื่อตัวละครตาย/เกิดใหม่
+LocalPlayer.CharacterAdded:Connect(function(char)
+   char:WaitForChild("Humanoid").WalkSpeed = walkSpeed
+   isFlyEnabled = false
+end)
